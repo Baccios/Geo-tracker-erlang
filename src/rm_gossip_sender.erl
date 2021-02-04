@@ -16,7 +16,9 @@
 
 -define(SERVER, ?MODULE).
 
--record(rm_gossip_sender_state, {neighbours, gossip_updates, configuration}).
+-record(rm_gossip_sender_state, {neighbours, gossip_updates, configuration, timeout}).
+
+-define(DEFAULT_TIMEOUT, 10000). % ten seconds
 
 %%%===================================================================
 %%% Spawning and gen_server implementation
@@ -26,14 +28,16 @@ start_link() ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 init([]) ->
+  erlang:send_after(?DEFAULT_TIMEOUT, rm_gossip_sender, trigger),
   {
     ok,
-    #rm_gossip_sender_state{
+    #rm_gossip_sender_state {
       neighbours = [],
       gossip_updates = [],
       % default configuration value
-      configuration = #config{version = 0, fanout = 4, max_neighbours = 8, sub_probability = 0.2}
-      }
+      configuration = get_default_config(),
+      timeout = ?DEFAULT_TIMEOUT % default value
+    }
   }.
 
 handle_call(_Request, _From, State = #rm_gossip_sender_state{}) ->
@@ -41,7 +45,9 @@ handle_call(_Request, _From, State = #rm_gossip_sender_state{}) ->
 
 handle_cast(
     Request,
-    State = #rm_gossip_sender_state{neighbours = Neighbours, gossip_updates = Gossips, configuration = Config}
+    State = #rm_gossip_sender_state{
+      neighbours = Neighbours, gossip_updates = Gossips, configuration = Config, timeout = Timeout
+    }
 ) ->
   case Request of
 
@@ -50,7 +56,9 @@ handle_cast(
       io:format("[rm_gossip_sender] received neighbours list: ~w~n", [Neigh_list]),
       {
         noreply, % we initialize neighbours list with the list received in the cast request
-        #rm_gossip_sender_state{neighbours = Neigh_list, gossip_updates = Gossips, configuration = Config}
+        #rm_gossip_sender_state{
+          neighbours = Neigh_list, gossip_updates = Gossips, configuration = Config, timeout = Timeout
+        }
       };
 
     %% used at the beginning to initialize configuration and later to update it
@@ -59,7 +67,9 @@ handle_cast(
       format_conf(New_Config),
       {
         noreply,
-        #rm_gossip_sender_state{neighbours = Neighbours, gossip_updates = Gossips, configuration = New_Config}
+        #rm_gossip_sender_state{
+          neighbours = Neighbours, gossip_updates = Gossips, configuration = New_Config, timeout = Timeout
+        }
       };
 
     {new_neighbour, Node_name} when is_atom(Node_name) ->
@@ -75,7 +85,8 @@ handle_cast(
             #rm_gossip_sender_state{
               neighbours = lists:delete(Node_name, Neighbours) ++ [Node_name],
               gossip_updates = Gossips,
-              configuration = Config
+              configuration = Config,
+              timeout = Timeout
             }
           };
         % otherwise replace a neighbor with a certain probability
@@ -85,7 +96,8 @@ handle_cast(
             #rm_gossip_sender_state{
               neighbours = substitute_rand_element(Neighbours, Node_name),
               gossip_updates = Gossips,
-              configuration = Config
+              configuration = Config,
+              timeout = Timeout
             }
           };
         true ->
@@ -113,7 +125,9 @@ handle_cast(
     {gossip, Updates} when is_list(Updates) ->
       {
         noreply,
-        #rm_gossip_sender_state{neighbours = Neighbours, gossip_updates = Gossips ++ Updates, configuration = Config}
+        #rm_gossip_sender_state{
+          neighbours = Neighbours, gossip_updates = Gossips ++ Updates, configuration = Config, timeout = Timeout
+        }
       };
 
     %% used to trigger the gossip for all gossip updates in the list
@@ -127,7 +141,19 @@ handle_cast(
       format_state(State),
       {
         noreply, % clear gossip updates list after gossip
-        #rm_gossip_sender_state{neighbours = Neighbours, gossip_updates = [], configuration = Config}
+        #rm_gossip_sender_state{
+          neighbours = Neighbours, gossip_updates = [], configuration = Config, timeout = Timeout
+        }
+      };
+
+    %% specifies the new gossip timeout (valid from the next trigger)
+    {gossip_timeout, NewTimeout} when NewTimeout > 0 ->
+      io:format("gossip timeout period set to ~w~n", [NewTimeout]),
+      {
+        noreply,
+        #rm_gossip_sender_state{
+          neighbours = Neighbours, gossip_updates = [], configuration = Config, timeout = NewTimeout
+        }
       };
 
     %% catch all clause
@@ -137,6 +163,10 @@ handle_cast(
 
   end.
 
+handle_info(trigger, State = #rm_gossip_sender_state{}) ->
+  gen_server:cast(rm_gossip_sender, {trigger}),
+  erlang:send_after(State#rm_gossip_sender_state.timeout, rm_gossip_sender, trigger),
+  {noreply, State};
 handle_info(_Info, State = #rm_gossip_sender_state{}) ->
   {noreply, State}.
 
@@ -188,7 +218,7 @@ send_gossip(Neighbours, GossipMsg, Fanout) ->
   %% send Msg to Fanout random neighbours inside Neighbours
   Send = fun (RMNode) ->
     % io:format("~w~n", [RMNode]) end, % DEBUG
-    gen_server:cast({RMNode, rm_gossip_reception}, GossipMsg) end,
+    gen_server:cast({rm_gossip_reception, RMNode}, GossipMsg) end,
 
   Targets = extract_gossip_targets(Neighbours, Fanout),
 

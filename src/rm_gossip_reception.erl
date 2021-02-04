@@ -31,9 +31,11 @@ init([]) ->
 handle_call(_Request, _From, State = #rm_gossip_reception_state{}) ->
   {reply, ok, State}.
 
-handle_cast(Request, #rm_gossip_reception_state{config_version = ConfigVersion}) ->
+handle_cast(Request, State = #rm_gossip_reception_state{config_version = ConfigVersion}) ->
 
   case Request of
+
+    % A gossip sent by another replica manager
     {gossip, From, Gossips} when is_list(Gossips) ->
       io:format("[rm_gossip_reception] Received a new gossip~n"),
       gen_server:cast(rm_gossip_sender, {new_neighbour, From}),
@@ -42,15 +44,20 @@ handle_cast(Request, #rm_gossip_reception_state{config_version = ConfigVersion})
         #rm_gossip_reception_state{config_version = parse_gossips(Gossips, ConfigVersion)}
       };
 
+    % sent by rm_map_server to notify a new configuration from a Dispatcher.
+    % It has already been delivered to rm_gossip_sender by rm_map_server
     {config, NewConfig = #config{}} ->
-      % this is sent by rm_map_server when the dispatcher sends a new configuration
       io:format("[rm_gossip_reception] Received a new configuration~n"),
       format_conf(NewConfig),
-      gen_server:cast(rm_gossip_sender, {config, NewConfig}), % TODO: this should be done by rm_map_server
       {
         noreply,
         #rm_gossip_reception_state{config_version = NewConfig#config.version}
-      }
+      };
+
+    % catch all clause
+    _ ->
+      io:format("[rm_gossip_reception] WARNING: bad request format"),
+      {noreply, State}
 
   end.
 
@@ -69,7 +76,7 @@ code_change(_OldVsn, State = #rm_gossip_reception_state{}, _Extra) ->
 
 parse_gossips([], ConfigVersion , [H|T]) ->
   % what remains in the third parameter are application gossip updates and are sent all together
-  gen_server:cast(rm_map_server, {updates, [H|T]}),
+  gen_server:cast(rm_map_server, {updates, gossip,[H|T]}),
   ConfigVersion;
 
 parse_gossips([], ConfigVersion , []) ->
@@ -80,7 +87,7 @@ parse_gossips([H = {config, Configuration = #config{}}|T], ConfigVersion, Update
     Configuration#config.version > ConfigVersion ->
       gen_server:cast(rm_gossip_sender, {gossip, management, H}),
       gen_server:cast(rm_gossip_sender, H),
-      gen_server:cast(rm_map_server, H),
+      gen_server:cast(rm_map_server, {config, gossip, Configuration}),
       parse_gossips(T, Configuration#config.version, Updates);
     true ->
       parse_gossips(T, ConfigVersion, Updates)

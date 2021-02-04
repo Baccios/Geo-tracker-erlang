@@ -12,3 +12,4 @@
 format_conf(#config{version = V, fanout = F, max_neighbours = M, sub_probability = S}) ->
   io:format("version: ~w, fanout: ~w, max_neighbours = ~w, sub_probability = ~w", [V,F,M,S]).
 
+get_default_config() -> #config{version = 0, fanout = 4, max_neighbours = 8, sub_probability = 0.2}.

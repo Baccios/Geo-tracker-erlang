@@ -1,0 +1,24 @@
+% MAP FORMAT
+
+    % Dispatcher (call)->
+    {map, [{UserID, Version} | T]}
+
+    % Replica Manager ->
+    {ok, [{UserID, Version, State} | T]}
+
+
+% CONFIG FORMAT
+
+    % Dispatcher (call or cast) ->
+    {config, NewConfig#config{}}
+
+    % Replica Manager (only in case of call) ->
+    ok
+
+% UPDATE FORMAT
+
+    % Dispatcher (call) ->
+    {update, UserID, Version, NewState, Priority}
+
+    % Replica Manager ->
+    {ok, NewVersion}
