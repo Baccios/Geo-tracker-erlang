@@ -8,6 +8,7 @@
 %%%-------------------------------------------------------------------
 -author("L. Bacciottini").
 -record(config, {version, fanout, max_neighbours, sub_probability}).
+-record(dispatcher_config, {rm_config, timeout_alive, gossip_protocol_timeout}).
 
 format_conf(#config{version = V, fanout = F, max_neighbours = M, sub_probability = S}) ->
   io:format("version: ~w, fanout: ~w, max_neighbours = ~w, sub_probability = ~w", [V,F,M,S]).
