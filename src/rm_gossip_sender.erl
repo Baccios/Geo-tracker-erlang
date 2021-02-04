@@ -100,11 +100,7 @@ handle_cast(
               timeout = Timeout
             }
           };
-        true ->
-          {
-            noreply,
-            State
-          }
+        true -> {noreply, State}
       end;
 
     %% used to push a management gossip
@@ -115,7 +111,7 @@ handle_cast(
         {gossip, node(), [Msg]},
         Config#config.fanout
       ),
-      format_state(State),
+      % format_state(State),  % DEBUG
       {
         noreply,
         State
