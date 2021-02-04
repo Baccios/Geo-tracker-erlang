@@ -53,8 +53,10 @@ handle_cast(
         #rm_gossip_sender_state{neighbours = Neigh_list, gossip_updates = Gossips, configuration = Config}
       };
 
-    %% used at the beginning to initialize configuration
-    {configuration, New_Config} when is_record(New_Config, config) ->
+    %% used at the beginning to initialize configuration and later to update it
+    {config, New_Config} when is_record(New_Config, config) ->
+      io:format("[rm_gossip_sender] Received a new configuration~n"),
+      format_conf(New_Config),
       {
         noreply,
         #rm_gossip_sender_state{neighbours = Neighbours, gossip_updates = Gossips, configuration = New_Config}
@@ -98,7 +100,7 @@ handle_cast(
       io:format("[rm_gossip_sender] received management message to gossip~n"),
       send_gossip(
         Neighbours,
-        [Msg],
+        {gossip, node(), [Msg]},
         Config#config.fanout
       ),
       format_state(State),
@@ -119,7 +121,7 @@ handle_cast(
       io:format("[rm_gossip_sender] received gossip trigger~n"),
       send_gossip(
         Neighbours,
-        Gossips,
+        {gossip, node(), Gossips},
         Config#config.fanout
       ),
       format_state(State),
@@ -180,13 +182,13 @@ extract_gossip_targets(Neighbours, Fanout) ->
   %% Return a list with Fanout random elements of Neighbours
   extract_gossip_targets_helper(Neighbours, Fanout, []).
 
-send_gossip(_, [], _) ->
+send_gossip(_, {gossip, _From, []}, _) ->
   empty_gossip;
-send_gossip(Neighbours, [H|T], Fanout) ->
+send_gossip(Neighbours, GossipMsg, Fanout) ->
   %% send Msg to Fanout random neighbours inside Neighbours
   Send = fun (RMNode) ->
     % io:format("~w~n", [RMNode]) end, % DEBUG
-    gen_server:cast({RMNode, rm_gossip_reception}, [H|T]) end,
+    gen_server:cast({RMNode, rm_gossip_reception}, GossipMsg) end,
 
   Targets = extract_gossip_targets(Neighbours, Fanout),
 
