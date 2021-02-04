@@ -1,7 +1,7 @@
 % MAP FORMAT
 
-    % Dispatcher (call)->
-    {map, [{UserID, Version} | T]}
+    % Dispatcher ->
+    gen_server:call({rm_map_server, rm_id@localhost}, {map, [{UserID, Version} | T]})
 
     % Replica Manager ->
     {ok, [{UserID, Version, State} | T]}
@@ -10,15 +10,16 @@
 % CONFIG FORMAT
 
     % Dispatcher (call or cast) ->
-    {config, NewConfig#config{}}
+    gen_server:cast({rm_map_server, rm_id@localhost},{config, NewConfig#config{}}) % asynchronous
+    gen_server:call({rm_map_server, rm_id@localhost}, {config, NewConfig#config{}}) % synchronous
 
     % Replica Manager (only in case of call) ->
     ok
 
 % UPDATE FORMAT
 
-    % Dispatcher (call) ->
-    {update, UserID, Version, NewState, Priority}
+    % Dispatcher ->
+    gen_server:call({rm_map_server, rm_id@localhost}, {update, UserID, Version, NewState, Priority})
 
     % Replica Manager ->
     {ok, NewVersion}

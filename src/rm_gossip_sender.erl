@@ -138,7 +138,7 @@ handle_cast(
         {gossip, node(), Gossips},
         Config#config.fanout
       ),
-      format_state(State),
+      % format_state(State), % DEBUG
       {
         noreply, % clear gossip updates list after gossip
         #rm_gossip_sender_state{
@@ -163,6 +163,7 @@ handle_cast(
 
   end.
 
+% used to trigger the periodic gossip
 handle_info(trigger, State = #rm_gossip_sender_state{}) ->
   gen_server:cast(rm_gossip_sender, {trigger}),
   erlang:send_after(State#rm_gossip_sender_state.timeout, rm_gossip_sender, trigger),
