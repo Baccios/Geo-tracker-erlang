@@ -32,7 +32,7 @@ init([]) ->
       neighbours = [],
       gossip_updates = [],
       % default configuration value
-      configuration = #config{version = 0, fanout = 4, max_neighbours = 15, sub_probability = 0.2}
+      configuration = #config{version = 0, fanout = 4, max_neighbours = 8, sub_probability = 0.2}
       }
   }.
 
@@ -47,6 +47,7 @@ handle_cast(
 
     %% used at the beginning to initialize neighbours list
     {neighbours, Neigh_list} when is_list(Neigh_list) ->
+      io:format("[rm_gossip_sender] received neighbours list: ~w~n", [Neigh_list]),
       {
         noreply, % we initialize neighbours list with the list received in the cast request
         #rm_gossip_sender_state{neighbours = Neigh_list, gossip_updates = Gossips, configuration = Config}
@@ -60,16 +61,17 @@ handle_cast(
       };
 
     {new_neighbour, Node_name} when is_atom(Node_name) ->
+      io:format("[rm_gossip_sender] received new possible neighbour: ~w~n", [Node_name]),
 
       Random = rand:uniform(), % to choose if the node must be added to neighbors
       if
-        % if neighbours list is not full always add the node
-        length(State#rm_gossip_sender_state.neighbours) <
-          State#rm_gossip_sender_state.configuration#config.max_neighbours ->
+        % if neighbours list is not full always add the node (if not already present)
+        length(Neighbours) <
+          Config#config.max_neighbours ->
           {
             noreply,
             #rm_gossip_sender_state{
-              neighbours = Neighbours ++ [Node_name],
+              neighbours = lists:delete(Node_name, Neighbours) ++ [Node_name],
               gossip_updates = Gossips,
               configuration = Config
             }
@@ -83,6 +85,11 @@ handle_cast(
               gossip_updates = Gossips,
               configuration = Config
             }
+          };
+        true ->
+          {
+            noreply,
+            State
           }
       end;
 
@@ -94,6 +101,7 @@ handle_cast(
         [Msg],
         Config#config.fanout
       ),
+      format_state(State),
       {
         noreply,
         State
@@ -114,6 +122,7 @@ handle_cast(
         Gossips,
         Config#config.fanout
       ),
+      format_state(State),
       {
         noreply, % clear gossip updates list after gossip
         #rm_gossip_sender_state{neighbours = Neighbours, gossip_updates = [], configuration = Config}
@@ -124,8 +133,7 @@ handle_cast(
       io:format("[rm_gossip_sender] WARNING: bad request format~n"),
       {noreply, State}
 
-  end,
-  {noreply, State}.
+  end.
 
 handle_info(_Info, State = #rm_gossip_sender_state{}) ->
   {noreply, State}.
@@ -172,10 +180,13 @@ extract_gossip_targets(Neighbours, Fanout) ->
   %% Return a list with Fanout random elements of Neighbours
   extract_gossip_targets_helper(Neighbours, Fanout, []).
 
-send_gossip(Neighbours, Msg, Fanout) ->
+send_gossip(_, [], _) ->
+  empty_gossip;
+send_gossip(Neighbours, [H|T], Fanout) ->
   %% send Msg to Fanout random neighbours inside Neighbours
   Send = fun (RMNode) ->
-    gen_server:cast({RMNode, rm_gossip_reception}, Msg) end,
+    % io:format("~w~n", [RMNode]) end, % DEBUG
+    gen_server:cast({RMNode, rm_gossip_reception}, [H|T]) end,
 
   Targets = extract_gossip_targets(Neighbours, Fanout),
 
