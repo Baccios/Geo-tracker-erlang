@@ -1,10 +1,20 @@
+|%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%|
+|                                                                      |
+| INTERFACES.TXT, the place where module interactions are standardized |
+|                                                                      |
+|%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%|
+
+%------------------------------------------------------------------------------------------
+Note: [term()] means that the list is composed of N elements matching term()
+%-------------------------------------------------------------------------------------------
+
 % MAP FORMAT
 
     % Dispatcher ->
-    gen_server:call({rm_map_server, rm_id@localhost}, {map, [{UserID, Version} | T]})
+    gen_server:call({rm_map_server, rm_id@localhost}, {map, [{UserID, Version}]})  %
 
     % Replica Manager ->
-    {ok, [{UserID, Version, State} | T]}
+    {ok, [{UserID, Version, State}]}
 
 
 % CONFIG FORMAT
