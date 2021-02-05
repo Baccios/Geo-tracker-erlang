@@ -27,8 +27,8 @@ start_link() ->
 
 init(Dispatchers) ->
   Table = ets:new(geo_map, []),
-  % default configuration value
-  Config = get_default_config(),
+  % initial configuration value, either sent by a dispatcher or default
+  Config = handle_registration_reply(register(Dispatchers)),
   {
     ok,
     #rm_map_server_state{table_id = Table, dispatchers = Dispatchers, configuration = Config, pending_requests = []}
@@ -56,7 +56,7 @@ handle_call(
       gen_server:cast(rm_gossip_sender, {gossip, [{update, UserID, Version, NewState}]}),
       {
         reply,
-        {ok, NewVersion},
+        {update_reply, NewVersion},
         State
       };
 
@@ -92,7 +92,7 @@ handle_call(
         RequirementsAreMet == true ->
           {
             reply,
-            {ok, ets:tab2list(Table)},
+            {map_reply, ets:tab2list(Table)},
             State
           };
         true ->
@@ -168,6 +168,13 @@ handle_cast(
 
   end.
 
+handle_info({alive, NextTimeout}, State = #rm_map_server_state{dispatchers = [H|T]}) ->
+  % send the periodic alive message to a random dispatcher
+  ChosenDispatcher = pick_random([H|T]),
+  catch gen_server:cast({dispatcher, ChosenDispatcher}, {alive, node()}), % if dispatcher is unavailable do not fail
+  erlang:send_after(NextTimeout, rm_map_server, {alive, NextTimeout}),
+  {noreply, State};
+
 handle_info(_Info, State = #rm_map_server_state{}) ->
   {noreply, State}.
 
@@ -227,7 +234,7 @@ check_versions([{UserID, Version}|T], Table) ->
   end;
 
 check_versions([_|_], _) ->
-  io:format("[rm_map_server] WARNING: bad format in a map request"),
+  io:format("[rm_map_server] WARNING: bad format in a map request~n"),
   bad_format.
 
 
@@ -242,19 +249,66 @@ handle_pending_requests([H = {From, {map, ConsistentUsers}}|T], Table, NotHandle
   RequirementsAreMet = check_versions(ConsistentUsers, Table),
   if
     RequirementsAreMet ->
-      gen_server:reply(From, {ok, ets:tab2list(Table)}),
+      gen_server:reply(From, {map_reply, ets:tab2list(Table)}),
       handle_pending_requests(T, Table, NotHandled);
     true ->
       handle_pending_requests(T, Table, NotHandled ++ [H])
   end;
 
 handle_pending_requests([_H|T], Table, NotHandled) ->
-  io:format("[rm_map_server] WARNING: bad format for a pending request"),
+  io:format("[rm_map_server] WARNING: bad format for a pending request~n"),
   handle_pending_requests(T, Table, NotHandled).
 
+% try to register at a given dispatcher node
+try_registration(Node) ->
+  catch gen_server:call({dispatcher, Node}, {registration, node()}).
 
+%pick a random element from List
+pick_random(List) ->
+  RandomIndex = rand:uniform(length(List)),
+  lists:nth(RandomIndex, List).
 
+% Register the current node to a random Dispatcher.
+register([]) ->
+  false;
+register(Dispatchers) ->
+  Chosen = pick_random(Dispatchers),
+  Result = try_registration(Chosen),
+  case Result of
+    {timeout, _Description}  -> % if call fails retry with another dispatcher
+      register(lists:delete(Chosen, Dispatchers));
+    {'EXIT', _} -> % dispatcher does not exist
+      register(lists:delete(Chosen, Dispatchers));
+    _Response ->
+      Result
+end.
 
+handle_registration_reply(
+    {registration_reply, Neighbours, TTL, AliveTimeout, GossipTimeout, Config = #config{}}) ->
+
+  % initialize rm_gossip_sender
+  gen_server:cast(rm_gossip_sender, {gossip_timeout, GossipTimeout}),
+  gen_server:cast(rm_gossip_sender, {gossip, management, {topology, node(), TTL}}),
+  gen_server:cast(rm_gossip_sender, {neighbours, Neighbours}),
+  gen_server:cast(rm_gossip_sender, {config, Config}),
+
+  % initialize rm_gossip_reception
+  gen_server:cast(rm_gossip_reception, {config, Config}),
+
+  % initialize alive timeout
+  erlang:send_after(AliveTimeout, rm_map_server, {alive, AliveTimeout}),
+
+  % return the initial configuration
+  io:format("[rm_map_server] Correctly registered at a dispatcher~n"),
+  Config;
+
+handle_registration_reply(false) ->
+  io:format("[rm_map_server] Could not contact any dispatcher. Using default configuration~n"),
+  get_default_config();
+
+handle_registration_reply(_) ->
+  io:format("[rm_map_server] The dispatcher reply was bad formed. Using default configuration~n"),
+  get_default_config().
 
 
 

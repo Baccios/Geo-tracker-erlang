@@ -14,7 +14,7 @@ Note: [term()] means that the list is composed of N elements matching term()
     gen_server:call({rm_map_server, rm_id@localhost}, {map, [{UserID, Version}]})  %
 
     % Replica Manager ->
-    {ok, [{UserID, Version, State}]}
+    {map_reply, [{UserID, Version, State}]}
 
 
 % CONFIG FORMAT
@@ -33,4 +33,4 @@ Note: [term()] means that the list is composed of N elements matching term()
     gen_server:call({rm_map_server, rm_id@localhost}, {update, UserID, Version, NewState, Priority})
 
     % Replica Manager ->
-    {ok, NewVersion}
+    {update_reply, NewVersion}
