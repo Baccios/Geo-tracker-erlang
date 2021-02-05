@@ -10,7 +10,7 @@
 -author("L. Bacciottini, F. Pacini").
 
 %% API
--export([spawn_rm/1, spawn_rm/0]).
+-export([spawn_rm/1, spawn_rm/0, spawn_dispatcher/2]).
 
 % spawns a replica manager on the current node
 % param Dispatchers: The list of nodes where dispatchers are spawned
@@ -21,3 +21,6 @@ spawn_rm(Dispatchers) ->
 
 spawn_rm() ->
   spawn_rm([]).
+
+spawn_dispatcher(Index,Total) -> %Total = total number of dispatcher, Index = ith position in total
+  gen_server:start({local, dispatcher}, dispatcher, {Index, Total}, []).

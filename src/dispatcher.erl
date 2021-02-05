@@ -1,6 +1,6 @@
 %%%-------------------------------------------------------------------
 %%% @author feder
-%%% @copyright (C) 2021, <COMPANY>
+%%% @copyright (C) 2021, UNIPI
 %%% @doc
 %%% @end
 %%%-------------------------------------------------------------------
@@ -20,6 +20,7 @@
 -define(TIMEOUT_ALIVE,5000). %%milliseconds
 -define(GOSSIP_PROTOCOL_TIMEOUT,50).
 
+-define(HOST,'@LAPTOP-90Q4PQKP').
 -record(dispatcher_state, {neighbours_list, rms_list, configuration}).
 %% neighbours_list = dispatchers
 %% rms_list = replica managers list
@@ -31,11 +32,11 @@
 start_link() ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
-init([]) ->
+init({Index, Total}) ->
   %erlang:send_after(?TIMEOUT_ALIVE, dispatcher, {check_alives_timeout}), %%handled by handle_info callback
   {ok,
     #dispatcher_state{
-      neighbours_list = [],
+      neighbours_list = initialize_neighbours_list(Index,Total,1),
       rms_list = [],
       % default configuration value %%timeout in milliseconds (5000ms = 5s)
       configuration = #dispatcher_config{ rm_config = #config{version = 0, fanout = 4, max_neighbours = 8, sub_probability = 0.2}, timeout_alive = ?TIMEOUT_ALIVE , gossip_protocol_timeout = ?GOSSIP_PROTOCOL_TIMEOUT}
@@ -225,3 +226,10 @@ send_message(Neighbours, Msg) ->
     gen_server:cast({dispatcher, DispatcherNode}, Msg) end, %dispatcher is the name of gen_server in DispatcherNode node
 
   lists:foreach(Send, Neighbours).
+
+initialize_neighbours_list(Index,Total,Current_step) ->
+  if
+    Current_step == Index -> initialize_neighbours_list(Index, Total, Current_step + 1);
+    Current_step =< Total -> [list_to_atom(atom_to_list('d') ++ atom_to_list(binary_to_atom(list_to_binary(integer_to_list(Current_step)),utf8)) ++ atom_to_list(?HOST))] ++ initialize_neighbours_list(Index, Total, Current_step + 1);
+    true -> []
+  end.
