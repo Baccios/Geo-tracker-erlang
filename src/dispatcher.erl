@@ -37,6 +37,9 @@ init({Index, Neighbours_list}) ->
   {ok,
     #dispatcher_state{
       neighbours_list = remove_nth_element_from_list(Index,Neighbours_list), %remove myself from list
+      %%%%%----------- FIXME
+      % neighbours_list = lists:delete(node(), Neighbours_list), % puoi fare così e risparmiarti il parametro Index
+      %%%%%-----------
       rms_list = [],
       % default configuration value %%timeout in milliseconds (5000ms = 5s)
       configuration = #dispatcher_config{ rm_config = #config{version = 0, fanout = 4, max_neighbours = 8, sub_probability = 0.2}, timeout_alive = ?TIMEOUT_ALIVE , gossip_protocol_timeout = ?GOSSIP_PROTOCOL_TIMEOUT}

@@ -10,8 +10,8 @@
 -author("L. Bacciottini, F. Pacini").
 
 %% API
--export([spawn_rm/1, spawn_rm/0, spawn_dispatcher/2, initialize_neighbours_list/1]).
--define(HOST,'@LAPTOP-90Q4PQKP').
+-export([spawn_rm/1, spawn_rm/0, spawn_dispatcher/2, initialize_dispatchers/1]).
+-define(HOST,'@localhost').
 
 % spawns a replica manager on the current node
 % param Dispatchers: The list of nodes where dispatchers are spawned
@@ -28,11 +28,11 @@ spawn_dispatcher(Index,Neighbours_list) -> %Total = total number of dispatcher, 
 
 %%Use as Neigh_List = cgtp:initialize_neighbours_list(5).
 %%Then, pass it to dispatchers gtgp:spawn_dispatcher(1..5,NL). where erl -sname d1..5
-initialize_neighbours_list(Total_number_of_dispatcher) ->
-  initialize_neighbours_list(Total_number_of_dispatcher, 1).
+initialize_dispatchers(Total_number_of_dispatcher) ->
+  initialize_dispatchers(Total_number_of_dispatcher, 1).
 
-initialize_neighbours_list(Total,Current_step) ->
+initialize_dispatchers(Total,Current_step) ->
   if
-    Current_step =< Total -> [list_to_atom(atom_to_list('d') ++ atom_to_list(binary_to_atom(list_to_binary(integer_to_list(Current_step)),utf8)) ++ atom_to_list(?HOST))] ++ initialize_neighbours_list(Total, Current_step + 1);
+    Current_step =< Total -> [list_to_atom(atom_to_list('d') ++ atom_to_list(binary_to_atom(list_to_binary(integer_to_list(Current_step)),utf8)) ++ atom_to_list(?HOST))] ++ initialize_dispatchers(Total, Current_step + 1);
     true -> []
   end.
