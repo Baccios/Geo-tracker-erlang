@@ -83,7 +83,13 @@ handle_call(
     {map, ConsistentUsers} ->
       RequirementsAreMet = check_versions(ConsistentUsers, Table),
       if
-        RequirementsAreMet ->
+        RequirementsAreMet == bad_format ->
+          {
+            reply,
+            bad_format,
+            State
+          };
+        RequirementsAreMet == true ->
           {
             reply,
             {ok, ets:tab2list(Table)},
@@ -204,7 +210,7 @@ handle_updates(Updates, Table) ->
 
 
 %% Check the geo map given a list of required {UserID, Version}.
-%% Return false if requirements are not met.
+%% Return false if requirements are not met, bad_format is the list is bad formed.
 check_versions([], _Table) ->
   true;
 
@@ -222,7 +228,7 @@ check_versions([{UserID, Version}|T], Table) ->
 
 check_versions([_|_], _) ->
   io:format("[rm_map_server] WARNING: bad format in a map request"),
-  false.
+  bad_format.
 
 
 %% handle all pending requests. Return the list of requests that still could not be handled.
