@@ -97,7 +97,8 @@ parse_gossips([{topology, From, TTL}|T], ConfigVersion, Updates) ->
   gen_server:cast(rm_gossip_sender, {new_neighbour, From}),
   if
     TTL > 1 ->
-      gen_server:cast(rm_gossip_sender, {gossip, management, {topology, From, TTL - 1}})
+      gen_server:cast(rm_gossip_sender, {gossip, management, {topology, From, TTL - 1}});
+    true -> true
   end,
   parse_gossips(T, ConfigVersion, Updates);
 

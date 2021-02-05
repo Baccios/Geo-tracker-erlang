@@ -72,11 +72,15 @@ handle_cast(
         }
       };
 
-    {new_neighbour, Node_name} when is_atom(Node_name) ->
+    {new_neighbour, Node_name} when is_atom(Node_name)  ->
       io:format("[rm_gossip_sender] received new possible neighbour: ~w~n", [Node_name]),
 
       Random = rand:uniform(), % to choose if the node must be added to neighbors
       if
+        % if the possible neighbour is this node ignore the request
+        Node_name == node() ->
+          {noreply, State};
+
         % if neighbours list is not full always add the node (if not already present)
         length(Neighbours) <
           Config#config.max_neighbours ->
@@ -89,6 +93,7 @@ handle_cast(
               timeout = Timeout
             }
           };
+
         % otherwise replace a neighbor with a certain probability
         Random < Config#config.sub_probability ->
           {
@@ -100,6 +105,7 @@ handle_cast(
               timeout = Timeout
             }
           };
+
         true -> {noreply, State}
       end;
 
@@ -128,7 +134,7 @@ handle_cast(
 
     %% used to trigger the gossip for all gossip updates in the list
     {trigger} ->
-      io:format("[rm_gossip_sender] received gossip trigger~n"),
+      % io:format("[rm_gossip_sender] received gossip trigger~n"), % DEBUG
       send_gossip(
         Neighbours,
         {gossip, node(), Gossips},
