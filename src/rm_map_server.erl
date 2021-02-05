@@ -48,7 +48,7 @@ handle_call(
       if
         AlreadyPresent ->
           CurrentVersion = ets:lookup_element(Table, UserID, 2);
-        not AlreadyPresent ->
+        true ->
           CurrentVersion = 0
       end,
       NewVersion = max(CurrentVersion, Version) + Priority,
@@ -71,7 +71,9 @@ handle_call(
           {
             reply,
             ok,
-            #rm_map_server_state{table_id = Table, dispatchers = Dispatchers, configuration = NewConfig}
+            #rm_map_server_state{
+              table_id = Table, dispatchers = Dispatchers, configuration = NewConfig, pending_requests = Pending
+            }
           };
         true ->
           {reply, old_version, State}
@@ -95,7 +97,12 @@ handle_call(
               pending_requests = Pending ++ [{From, Request}]
             }
           }
-      end
+      end;
+
+    % catch all clause
+    _ ->
+      io:format("[rm_map_server] WARNING: bad call request format"),
+      {reply, bad_format, State}
 
   end.
 
@@ -122,7 +129,13 @@ handle_cast(
     % It has already been delivered to rm_gossip_sender by rm_gossip_reception. thus, only update
     % the current configuration.
     {config, gossip, NewConfig=#config{}} ->
-      {noreply, #rm_map_server_state{table_id = Table, dispatchers = Dispatchers, configuration = NewConfig}};
+      io:format("[rm_map_server] received new configuration from gossip"),
+      {
+        noreply,
+        #rm_map_server_state{
+          table_id = Table, dispatchers = Dispatchers, configuration = NewConfig, pending_requests = Pending
+        }
+      };
 
     % sent by a Dispatcher to update the configuration
     % Now the new config must also be sent to rm_gossip_sender and rm_gossip_reception
@@ -134,11 +147,19 @@ handle_cast(
           gen_server:cast(rm_gossip_sender, {gossip, management, Request}),
           {
             noreply,
-            #rm_map_server_state{table_id = Table, dispatchers = Dispatchers, configuration = NewConfig}
+            #rm_map_server_state{
+              table_id = Table, dispatchers = Dispatchers, configuration = NewConfig, pending_requests = Pending
+            }
           };
         true ->
           {noreply, State}
-      end
+      end;
+
+    % catch all clause
+    _ ->
+      io:format("[rm_map_server] WARNING: bad cast request format"),
+      {noreply, State}
+
   end.
 
 handle_info(_Info, State = #rm_map_server_state{}) ->
@@ -159,12 +180,18 @@ handle_updates([], _, Gossips) ->
   Gossips;
 
 handle_updates([H = {update, UserID, Version, NewState}|T], Table, Gossips) ->
-  CurrentVersion = ets:lookup_element(Table, UserID, 2),
+  Present = ets:member(Table, UserID),
   if
-    CurrentVersion >= Version or not is_atom(UserID)->
-      handle_updates(T, Table, Gossips);
+    Present ->
+      CurrentVersion = ets:lookup_element(Table, UserID, 2),
+      if
+        CurrentVersion < Version ->
+          ets:insert(Table, {UserID, Version, NewState}),
+          handle_updates(T, Table, Gossips ++ [H]);
+        true -> handle_updates(T, Table, Gossips)
+      end;
     true ->
-      ets:insert(Table, {UserID, Version, NewState}),
+      ets:insert_new(Table, {UserID, Version, NewState}),
       handle_updates(T, Table, Gossips ++ [H])
   end;
 
