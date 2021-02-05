@@ -18,7 +18,7 @@
 
 -record(rm_gossip_sender_state, {neighbours, gossip_updates, configuration, timeout}).
 
--define(DEFAULT_TIMEOUT, 10000). % ten seconds
+-define(DEFAULT_TIMEOUT, 100). % milliseconds
 
 %%%===================================================================
 %%% Spawning and gen_server implementation
