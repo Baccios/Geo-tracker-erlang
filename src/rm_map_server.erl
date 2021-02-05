@@ -75,6 +75,7 @@ handle_call(
           };
         true ->
           {reply, old_version, State}
+      end;
 
     % sent by a Dispatcher. It asks for a map with certain version requirements
     {map, ConsistentUsers} ->
