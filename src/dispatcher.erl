@@ -20,7 +20,6 @@
 -define(TIMEOUT_ALIVE,5000). %%milliseconds
 -define(GOSSIP_PROTOCOL_TIMEOUT,50).
 
--define(HOST,'@LAPTOP-90Q4PQKP').
 -record(dispatcher_state, {neighbours_list, rms_list, configuration}).
 %% neighbours_list = dispatchers
 %% rms_list = replica managers list
@@ -32,11 +31,12 @@
 start_link() ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
-init({Index, Total}) ->
+init({Index, Neighbours_list}) ->
   %erlang:send_after(?TIMEOUT_ALIVE, dispatcher, {check_alives_timeout}), %%handled by handle_info callback
+  io:format("List ~w~n", [Neighbours_list]),
   {ok,
     #dispatcher_state{
-      neighbours_list = initialize_neighbours_list(Index,Total,1),
+      neighbours_list = remove_nth_element_from_list(Index,Neighbours_list), %remove myself from list
       rms_list = [],
       % default configuration value %%timeout in milliseconds (5000ms = 5s)
       configuration = #dispatcher_config{ rm_config = #config{version = 0, fanout = 4, max_neighbours = 8, sub_probability = 0.2}, timeout_alive = ?TIMEOUT_ALIVE , gossip_protocol_timeout = ?GOSSIP_PROTOCOL_TIMEOUT}
@@ -227,9 +227,6 @@ send_message(Neighbours, Msg) ->
 
   lists:foreach(Send, Neighbours).
 
-initialize_neighbours_list(Index,Total,Current_step) ->
-  if
-    Current_step == Index -> initialize_neighbours_list(Index, Total, Current_step + 1);
-    Current_step =< Total -> [list_to_atom(atom_to_list('d') ++ atom_to_list(binary_to_atom(list_to_binary(integer_to_list(Current_step)),utf8)) ++ atom_to_list(?HOST))] ++ initialize_neighbours_list(Index, Total, Current_step + 1);
-    true -> []
-  end.
+remove_nth_element_from_list(Index, List) ->
+  Target = lists:nth(Index, List),
+  lists:delete(Target, List).
