@@ -60,6 +60,22 @@ handle_call(
         State
       };
 
+    % sent by a Dispatcher to update the configuration
+    % Now the new config must also be sent to rm_gossip_sender and rm_gossip_reception
+    {config, NewConfig=#config{}} ->
+      if
+        NewConfig#config.version > Config#config.version ->
+          gen_server:cast(rm_gossip_reception, Request),
+          gen_server:cast(rm_gossip_sender, Request),
+          gen_server:cast(rm_gossip_sender, {gossip, management, Request}),
+          {
+            reply,
+            ok,
+            #rm_map_server_state{table_id = Table, dispatchers = Dispatchers, configuration = NewConfig}
+          };
+        true ->
+          {reply, old_version, State}
+
     % sent by a Dispatcher. It asks for a map with certain version requirements
     {map, ConsistentUsers} ->
       RequirementsAreMet = check_versions(ConsistentUsers, Table),

@@ -24,7 +24,8 @@ Note: [term()] means that the list is composed of N elements matching term()
     gen_server:call({rm_map_server, rm_id@localhost}, {config, NewConfig#config{}}) % synchronous
 
     % Replica Manager (only in case of call) ->
-    ok
+    ok (if config was correctly updated)
+    old_version (if config sent is obsolete)
 
 % UPDATE FORMAT
 
