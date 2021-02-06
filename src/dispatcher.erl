@@ -23,6 +23,10 @@
 -define(INCREMENT_FANOUT_STEP,2).
 -define(INCREMENT_MAX_NEIGHBOURS_STEP,5).
 
+-define(MAP_TIMEOUT, 500).
+
+-define(MAX_GOSSIP_CYCLES, 1).
+
 -record(dispatcher_state, {neighbours_list, rms_list, configuration}).
 %% neighbours_list = dispatchers
 %% rms_list = replica managers list
@@ -35,14 +39,14 @@ start_link() ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 init(Neighbours_list) ->
-  %erlang:send_after(?TIMEOUT_ALIVE, dispatcher, {check_alives_timeout}), %%handled by handle_info callback
+  erlang:send_after(?TIMEOUT_ALIVE, dispatcher, {check_alives_timeout}), %%handled by handle_info callback
   io:format("List ~w~n", [Neighbours_list]),
   {ok,
     #dispatcher_state{
       neighbours_list = lists:delete(node(), Neighbours_list),
       rms_list = [],
       % default configuration value %%timeout in milliseconds (5000ms = 5s)
-      configuration = #dispatcher_config{ rm_config = #config{version = 0, fanout = 4, max_neighbours = 8, sub_probability = 0.2}, timeout_alive = ?TIMEOUT_ALIVE , gossip_protocol_timeout = ?GOSSIP_PROTOCOL_TIMEOUT}
+      configuration = #dispatcher_config{ rm_config = #config{version = 0, fanout = 2, max_neighbours = 8, sub_probability = 0.2}, timeout_alive = ?TIMEOUT_ALIVE , gossip_protocol_timeout = ?GOSSIP_PROTOCOL_TIMEOUT}
     }
   }.
 
@@ -61,7 +65,7 @@ handle_call(Request, From, State = #dispatcher_state{neighbours_list = Neigh_lis
           New_version = Config#dispatcher_config.rm_config#config.version + 1,
           send_message(Neigh_list,{config_change,New_version}),
           New_rm_config = update_config(Config, New_version),
-          gen_server:cast({rm_map_server, extract_n_random_element_from_list(Rms_list,1)},{config, New_rm_config#dispatcher_config.rm_config}); %%infect one rm
+          gen_server:cast({rm_map_server,lists:nth(1, extract_n_random_element_from_list(Rms_list,1))},{config, New_rm_config#dispatcher_config.rm_config}); %%infect one rm
         _ -> New_rm_config = Config
       end,
       Reply = {registration_reply,
@@ -92,14 +96,23 @@ handle_call(Request, From, State = #dispatcher_state{neighbours_list = Neigh_lis
     {map, List_of_user_id_version} ->
       io:format("[dispatcher] receive a map mex from user: ~w~n", [From]),
       RM_ID = lists:nth(1, extract_n_random_element_from_list(Rms_list,1)), %%Since extract.. returns a list (in this case of 1 element)
-      Reply = gen_server:call({rm_map_server, RM_ID},{map, List_of_user_id_version}),
-      %%Update alive
-      %%Return reply
-      {
-        reply,
-        Reply,
-        #dispatcher_state{neighbours_list = Neigh_list, rms_list = renew_last_time_contact_of_rm_in_list(RM_ID,Rms_list), configuration = Config}
-      };
+      Reply = (catch gen_server:call({rm_map_server, RM_ID},{map, List_of_user_id_version}, ?MAP_TIMEOUT)),
+      case Reply of
+        {map_reply, _Map}  ->
+          %%Update alive
+          %%Return reply
+          {
+            reply,
+            Reply,
+            #dispatcher_state{neighbours_list = Neigh_list, rms_list = renew_last_time_contact_of_rm_in_list(RM_ID,Rms_list), configuration = Config}
+          };
+        _Error ->
+          {
+            reply,
+            {error, not_responding},
+            State
+          }
+      end;
 
     %% catch all clause
     _ ->
@@ -108,8 +121,8 @@ handle_call(Request, From, State = #dispatcher_state{neighbours_list = Neigh_lis
   end.
 
 handle_cast(Request, State = #dispatcher_state{neighbours_list = Neigh_list, rms_list = Rms_list, configuration = Config}) -> %Asynchronous request
-  io:format("Cast requested: Request = ~w ~n",[Request]),
-  format_state(State),
+  % io:format("Cast requested: Request = ~w ~n",[Request]), % DEBUG
+  % format_state(State), % DEBUG
   case Request of
 
     %% used to add a dispatcher id to the list of neighbours
@@ -136,7 +149,7 @@ handle_cast(Request, State = #dispatcher_state{neighbours_list = Neigh_list, rms
       };
 
     {alive,RM_id} when is_atom(RM_id) ->
-      io:format("[dispatcher] received an alive mex from RM: ~w~n", [RM_id]),
+      % io:format("[dispatcher] received an alive mex from RM: ~w~n", [RM_id]), % DEBUG
       send_message(Neigh_list,{alive_propagation,RM_id}), %not alive otherwise ping pong effect
       {
         noreply,
@@ -144,7 +157,7 @@ handle_cast(Request, State = #dispatcher_state{neighbours_list = Neigh_list, rms
       };
 
     {alive_propagation,RM_id} when is_atom(RM_id) ->
-      io:format("[dispatcher] received an alive_propagation mex from RM: ~w~n", [RM_id]),
+      % io:format("[dispatcher] received an alive_propagation mex from RM: ~w~n", [RM_id]), % DEBUG
       {
       noreply,
       #dispatcher_state{neighbours_list = Neigh_list, rms_list = renew_last_time_contact_of_rm_in_list(RM_id,Rms_list), configuration = Config}
@@ -175,11 +188,11 @@ handle_cast(Request, State = #dispatcher_state{neighbours_list = Neigh_list, rms
 handle_info(Info, State = #dispatcher_state{}) ->
   case Info of
     {check_alives_timeout} ->
-      io:format("Timeout expired: time to check rms alives ~n"),
+      % io:format("Timeout expired: time to check rms alives ~n"), % DEBUG
       gen_server:cast(dispatcher, {check_alives}),
       erlang:send_after(?TIMEOUT_ALIVE, dispatcher, {check_alives_timeout});
     _ ->
-      io:format("[dispatcher] WARNING: bad mex format in handle_info~n")
+      io:format("[dispatcher] WARNING: bad mex format in handle_info~n") % DEBUG
   end,
   {noreply, State}.
 
@@ -245,7 +258,7 @@ remove_nth_element_from_list(Index, List) ->
 check_validity_of_rm_config(Fanout, Number_of_nodes) ->
   Average_cycles_gossip_protocol = ceil(log10(Number_of_nodes) / log10(Fanout)),
   if
-    Average_cycles_gossip_protocol =< 3 -> ok;
+    Average_cycles_gossip_protocol =< ?MAX_GOSSIP_CYCLES -> ok;
     true -> bad
   end.
 
@@ -260,7 +273,7 @@ update_config(Config, New_Version) ->
       Sub_probability = Config#dispatcher_config.rm_config#config.sub_probability,
       Updated_version = Config#dispatcher_config.rm_config#config.version + 1,
       Updated_fanout = Config#dispatcher_config.rm_config#config.fanout + ?INCREMENT_FANOUT_STEP,
-      Updated_max_neighbours = Config#dispatcher_config.rm_config#config.fanout + ?INCREMENT_MAX_NEIGHBOURS_STEP,
+      Updated_max_neighbours = Config#dispatcher_config.rm_config#config.max_neighbours + ?INCREMENT_MAX_NEIGHBOURS_STEP,
 
       New_rm_config = #config{version = Updated_version, fanout = Updated_fanout, max_neighbours = Updated_max_neighbours, sub_probability = Sub_probability},
       New_config = #dispatcher_config{rm_config= New_rm_config ,timeout_alive = Timeout_alive ,gossip_protocol_timeout = Gossip_protocol_timeout },
