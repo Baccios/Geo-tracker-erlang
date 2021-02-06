@@ -55,7 +55,7 @@ handle_call(Request, From, State = #dispatcher_state{neighbours_list = Neigh_lis
       %io:format("time : ~w" ,[erlang:monotonic_time(millisecond)]),
       io:format("[dispatcher] receive a registration mex from RM: ~w~n", [RM_id]),
       send_message(Neigh_list,{registration_propagation,RM_id}),
-      Validity = check_validity_of_rm_config(Config#dispatcher_config.rm_config#config.fanout, length((Rms_list) + 1)),
+      Validity = check_validity_of_rm_config(Config#dispatcher_config.rm_config#config.fanout, length(Rms_list) + 1),
       case Validity of
         bad ->
           New_version = Config#dispatcher_config.rm_config#config.version + 1,

@@ -27,7 +27,7 @@ spawn_dispatcher(Neighbours_list) -> %Total = total number of dispatcher, Index 
   gen_server:start({local, dispatcher}, dispatcher, Neighbours_list, []).
 
 %%Use as Neigh_List = cgtp:initialize_neighbours_list(5).
-%%Then, pass it to dispatchers gtgp:spawn_dispatcher(1..5,NL). where erl -sname d1..5
+%%Then, pass it to dispatchers gtgp:spawn_dispatcher(1..5,NL). where erl -sname d1..5@localhost
 initialize_dispatchers(Total_number_of_dispatcher) ->
   initialize_dispatchers(Total_number_of_dispatcher, 1).
 
