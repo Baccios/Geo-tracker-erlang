@@ -43,7 +43,7 @@ handle_call(
   case Request of
 
     % sent by a Dispatcher. It updates a user's state
-    {update, UserID, Version, NewState, Priority} when is_integer(Priority) and Priority > 0 ->
+    {update, UserID, Version, NewState, Priority} when is_integer(Priority) and (Priority > 0) and (Priority < 4) ->
       AlreadyPresent = ets:member(Table, UserID),
       if
         AlreadyPresent ->
@@ -53,7 +53,7 @@ handle_call(
       end,
       NewVersion = max(CurrentVersion, Version) + Priority,
       ets:insert(Table, {UserID, NewVersion, NewState}),
-      gen_server:cast(rm_gossip_sender, {gossip, [{update, UserID, Version, NewState}]}),
+      gen_server:cast(rm_gossip_sender, {gossip, [{update, UserID, NewVersion, NewState}]}),
       {
         reply,
         {update_reply, NewVersion},
@@ -107,7 +107,7 @@ handle_call(
 
     % catch all clause
     _ ->
-      io:format("[rm_map_server] WARNING: bad call request format"),
+      io:format("[rm_map_server] WARNING: bad call request format~n"),
       {reply, bad_format, State}
 
   end.
@@ -135,7 +135,7 @@ handle_cast(
     % It has already been delivered to rm_gossip_sender by rm_gossip_reception. thus, only update
     % the current configuration.
     {config, gossip, NewConfig=#config{}} ->
-      io:format("[rm_map_server] received new configuration from gossip"),
+      io:format("[rm_map_server] received new configuration from gossip~n"),
       {
         noreply,
         #rm_map_server_state{
@@ -163,7 +163,7 @@ handle_cast(
 
     % catch all clause
     _ ->
-      io:format("[rm_map_server] WARNING: bad cast request format"),
+      io:format("[rm_map_server] WARNING: bad cast request format~n"),
       {noreply, State}
 
   end.

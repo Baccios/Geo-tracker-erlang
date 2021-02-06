@@ -218,6 +218,7 @@ extract_gossip_targets(Neighbours, Fanout) ->
 send_gossip(_, {gossip, _From, []}, _) ->
   empty_gossip;
 send_gossip(Neighbours, GossipMsg, Fanout) ->
+  io:format("[rm_map_server] sending gossip ~w~n", [GossipMsg]), % DEBUG
   %% send Msg to Fanout random neighbours inside Neighbours
   Send = fun (RMNode) ->
     % io:format("~w~n", [RMNode]) end, % DEBUG
