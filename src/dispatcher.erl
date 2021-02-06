@@ -65,7 +65,7 @@ handle_call(Request, From, State = #dispatcher_state{neighbours_list = Neigh_lis
           New_version = Config#dispatcher_config.rm_config#config.version + 1,
           send_message(Neigh_list,{config_change,New_version}),
           New_rm_config = update_config(Config, New_version),
-          gen_server:cast({rm_map_server,lists:nth(1, extract_n_random_element_from_list(Rms_list,1))},{config, New_rm_config#dispatcher_config.rm_config}); %%infect one rm
+          gen_server:cast({rm_map_server,pick_random_element(Rms_list)},{config, New_rm_config#dispatcher_config.rm_config}); %%infect one rm
         _ -> New_rm_config = Config
       end,
       Reply = {registration_reply,
@@ -83,7 +83,7 @@ handle_call(Request, From, State = #dispatcher_state{neighbours_list = Neigh_lis
 
     {update, User_ID, New_state, Version, Priority} ->
       io:format("[dispatcher] receive a update mex from user: ~w~n", [User_ID]),
-      RM_ID = lists:nth(1, extract_n_random_element_from_list(Rms_list,1)), %%Since extract.. returns a list (in this case of 1 element)
+      RM_ID = pick_random_element(Rms_list), %%Since extract.. returns a list (in this case of 1 element)
       Reply = gen_server:call({rm_map_server, RM_ID},{update, User_ID, New_state, Version, Priority}),
       %%Update alive
       %%Return reply
@@ -95,7 +95,7 @@ handle_call(Request, From, State = #dispatcher_state{neighbours_list = Neigh_lis
 
     {map, List_of_user_id_version} ->
       io:format("[dispatcher] receive a map mex from user: ~w~n", [From]),
-      RM_ID = lists:nth(1, extract_n_random_element_from_list(Rms_list,1)), %%Since extract.. returns a list (in this case of 1 element)
+      RM_ID = pick_random_element(Rms_list), %%Since extract.. returns a list (in this case of 1 element)
       Reply = (catch gen_server:call({rm_map_server, RM_ID},{map, List_of_user_id_version}, ?MAP_TIMEOUT)),
       case Reply of
         {map_reply, _Map}  ->
@@ -213,6 +213,10 @@ extract_n_random_element_from_list(List, N) -> %%helper function
   Index = rand:uniform(length(List)),
   Chosen = lists:nth(Index, List),
   [element(1,Chosen)] ++ extract_n_random_element_from_list(lists:delete(Chosen, List), N - 1).
+
+pick_random_element(List) ->
+  RandomIndex = rand:uniform(length(List)),
+  lists:nth(RandomIndex, List).
 
 get_neigh_list_for_new_rm(Rms_list, MaxNeigh) ->
   if
