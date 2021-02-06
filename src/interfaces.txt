@@ -34,3 +34,16 @@ Note: [term()] means that the list is composed of N elements matching term()
 
     % Replica Manager ->
     {update_reply, NewVersion}
+
+% REGISTRATION FORMAT
+
+    % Replica Manager ->
+    gen_server:call({dispatcher, Node}, {registration, node()})
+
+    % Dispatcher ->
+    {registration_reply, [rm1@localhost], TTL, AliveTimeout, GossipTimeout, Config#config{}}
+
+% ALIVE FORMAT
+
+    % Replica Manager (periodically) ->
+    gen_server:cast({dispatcher, Node}, {alive, node()})
