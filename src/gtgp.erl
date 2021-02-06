@@ -10,7 +10,7 @@
 -author("L. Bacciottini, F. Pacini").
 
 %% API
--export([spawn_rm/1, spawn_rm/0, spawn_dispatcher/2, initialize_dispatchers/1]).
+-export([spawn_rm/1, spawn_rm/0, spawn_dispatcher/1, initialize_dispatchers/1]).
 -define(HOST,'@localhost').
 
 % spawns a replica manager on the current node
@@ -23,8 +23,8 @@ spawn_rm(Dispatchers) ->
 spawn_rm() ->
   spawn_rm([]).
 
-spawn_dispatcher(Index,Neighbours_list) -> %Total = total number of dispatcher, Index = ith position in total
-  gen_server:start({local, dispatcher}, dispatcher, {Index, Neighbours_list}, []).
+spawn_dispatcher(Neighbours_list) -> %Total = total number of dispatcher, Index = ith position in total
+  gen_server:start({local, dispatcher}, dispatcher, Neighbours_list, []).
 
 %%Use as Neigh_List = cgtp:initialize_neighbours_list(5).
 %%Then, pass it to dispatchers gtgp:spawn_dispatcher(1..5,NL). where erl -sname d1..5
