@@ -46,13 +46,13 @@ init(Neighbours_list) ->
       neighbours_list = lists:delete(node(), Neighbours_list),
       rms_list = [],
       % default configuration value %%timeout in milliseconds (5000ms = 5s)
-      configuration = #dispatcher_config{ rm_config = #config{version = 0, fanout = 4, max_neighbours = 8, sub_probability = 0.3}, timeout_alive = ?TIMEOUT_ALIVE , gossip_protocol_timeout = ?GOSSIP_PROTOCOL_TIMEOUT}
+      configuration = #dispatcher_config{ rm_config = get_default_config(), timeout_alive = ?TIMEOUT_ALIVE , gossip_protocol_timeout = ?GOSSIP_PROTOCOL_TIMEOUT}
     }
   }.
 
 handle_call(Request, From, State = #dispatcher_state{neighbours_list = Neigh_list, rms_list = Rms_list, configuration = Config}) -> %Synchronous request
-  io:format("Call requested: Request = ~w From = ~w ~n",[Request, From]),
-  format_state(State),
+  io:format("Call requested: Request = ~w From = ~w ~n",[Request, From]), % DEBUG
+  %format_state(State), % DEBUG
   case Request of
     %% used by a rm to reveal its presence
     {registration, RM_id} when is_atom(RM_id) ->
@@ -205,12 +205,6 @@ code_change(_OldVsn, State = #dispatcher_state{}, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-format_state(#dispatcher_state{neighbours_list = N, rms_list = R, configuration = C}) ->
-  %% used for debugging, prints the internal server state
-  io:format("**STATE**~nneighbours: ~w, ~nrms: ~w,~nconfiguration: { ", [N,R]),
-  format_dispatcher_conf(C),
-  io:format("}~n").
-
 
 extract_n_random_element_from_list([], _) -> []; %%helper function
 extract_n_random_element_from_list(_, 0) -> []; %%helper function
@@ -251,9 +245,6 @@ send_message(Neighbours, Msg) ->
 
   lists:foreach(Send, Neighbours).
 
-remove_nth_element_from_list(Index, List) ->
-  Target = lists:nth(Index, List),
-  lists:delete(Target, List).
 
 check_validity_of_rm_config(Fanout, Number_of_nodes) ->
   Average_cycles_gossip_protocol = ceil(log10(Number_of_nodes) / log10(Fanout)),
@@ -282,3 +273,12 @@ update_config(Config, New_Version) ->
 
 
 
+%%%%%%%%==================================================================%%%%%%%%
+% Format functions used in development phase. Commented to avoid unused warnings %
+%%%%%%%%==================================================================%%%%%%%%
+
+%_format_state(#dispatcher_state{neighbours_list = N, rms_list = R, configuration = C}) ->
+%% used for debugging, prints the internal server state
+%  io:format("**STATE**~nneighbours: ~w, ~nrms: ~w,~nconfiguration: { ", [N,R]),
+%  format_dispatcher_conf(C),
+%  io:format("}~n").

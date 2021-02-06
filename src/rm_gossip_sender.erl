@@ -63,8 +63,8 @@ handle_cast(
 
     %% used at the beginning to initialize configuration and later to update it
     {config, New_Config} when is_record(New_Config, config) ->
-      io:format("[rm_gossip_sender] Received a new configuration~n"),
-      format_conf(New_Config),
+      io:format("[rm_gossip_sender] Received a new configuration with version ~w~n",
+        [New_Config#config.version]),
       {
         noreply,
         #rm_gossip_sender_state{
@@ -73,7 +73,7 @@ handle_cast(
       };
 
     {new_neighbour, Node_name} when is_atom(Node_name)  ->
-      io:format("[rm_gossip_sender] received new possible neighbour: ~w~n", [Node_name]),
+      %io:format("[rm_gossip_sender] received new possible neighbour: ~w~n", [Node_name]), % DEBUG
 
       Random = rand:uniform(), % to choose if the node must be added to neighbors
       if
@@ -111,7 +111,7 @@ handle_cast(
 
     %% used to push a management gossip
     {gossip, management, Msg} ->
-      io:format("[rm_gossip_sender] received management message to gossip~n"),
+      io:format("[rm_gossip_sender] sending management gossip~n"), % DEBUG
       send_gossip(
         Neighbours,
         {gossip, node(), [Msg]},
@@ -218,7 +218,7 @@ extract_gossip_targets(Neighbours, Fanout) ->
 send_gossip(_, {gossip, _From, []}, _) ->
   empty_gossip;
 send_gossip(Neighbours, GossipMsg, Fanout) ->
-  io:format("[rm_map_server] sending gossip ~w~n", [GossipMsg]), % DEBUG
+  % io:format("[rm_gossip_sender] sending gossip ~w~n", [GossipMsg]), % DEBUG
   %% send Msg to Fanout random neighbours inside Neighbours
   Send = fun (RMNode) ->
     % io:format("~w~n", [RMNode]) end, % DEBUG
@@ -229,10 +229,15 @@ send_gossip(Neighbours, GossipMsg, Fanout) ->
   lists:foreach(Send, Targets).
 
 
-format_state(#rm_gossip_sender_state{neighbours = N, gossip_updates = G, configuration = C}) ->
+
+%%%%%%%%==================================================================%%%%%%%%
+% Format functions used in development phase. Commented to avoid unused warnings %
+%%%%%%%%==================================================================%%%%%%%%
+
+%format_state(#rm_gossip_sender_state{neighbours = N, gossip_updates = G, configuration = C}) ->
   %% used for debugging, prints the internal server state
-  io:format("neighbours: ~w,~ngossip_updates: ~w,~nconfiguration: { ", [N,G]),
-  format_conf(C),
-  io:format("}~n").
+%  io:format("neighbours: ~w,~ngossip_updates: ~w,~nconfiguration: { ", [N,G]),
+%  format_conf(C),
+%  io:format("}~n").
 
 

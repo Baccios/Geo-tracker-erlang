@@ -26,7 +26,8 @@ start_link() ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 init([]) ->
-  {ok, #rm_gossip_reception_state{config_version = 0}}.
+  Config = get_default_config(),
+  {ok, #rm_gossip_reception_state{config_version = Config#config.version}}.
 
 handle_call(_Request, _From, State = #rm_gossip_reception_state{}) ->
   {reply, ok, State}.
@@ -37,7 +38,7 @@ handle_cast(Request, State = #rm_gossip_reception_state{config_version = ConfigV
 
     % A gossip sent by another replica manager
     {gossip, From, Gossips} when is_list(Gossips) ->
-      io:format("[rm_gossip_reception] Received a new gossip~n"),
+      % io:format("[rm_gossip_reception] Received a new gossip~n"), % DEBUG
       gen_server:cast(rm_gossip_sender, {new_neighbour, From}),
       {
         noreply,
@@ -47,8 +48,8 @@ handle_cast(Request, State = #rm_gossip_reception_state{config_version = ConfigV
     % sent by rm_map_server to notify a new configuration from a Dispatcher.
     % It has already been delivered to rm_gossip_sender by rm_map_server
     {config, NewConfig = #config{}} ->
-      io:format("[rm_gossip_reception] Received a new configuration~n"),
-      format_conf(NewConfig),
+      io:format("[rm_gossip_reception] Received a new configuration with version ~w~n",
+        [NewConfig#config.version]),
       {
         noreply,
         #rm_gossip_reception_state{config_version = NewConfig#config.version}
@@ -83,6 +84,8 @@ parse_gossips([], ConfigVersion , []) ->
   ConfigVersion;
 
 parse_gossips([H = {config, Configuration = #config{}}|T], ConfigVersion, Updates) ->
+  io:format("[rm_gossip_reception] Received a config gossip with version ~w~n",
+    [Configuration#config.version]), % DEBUG
   if
     Configuration#config.version > ConfigVersion ->
       gen_server:cast(rm_gossip_sender, {gossip, management, H}),
@@ -94,9 +97,11 @@ parse_gossips([H = {config, Configuration = #config{}}|T], ConfigVersion, Update
   end;
 
 parse_gossips([{topology, From, TTL}|T], ConfigVersion, Updates) ->
+  io:format("[rm_gossip_reception] Received a topology gossip with TTL = ~w for ~w~n",
+    [TTL, From]), % DEBUG
   gen_server:cast(rm_gossip_sender, {new_neighbour, From}),
   if
-    TTL > 1 ->
+    TTL >= 1 ->
       gen_server:cast(rm_gossip_sender, {gossip, management, {topology, From, TTL - 1}});
     true -> true
   end,

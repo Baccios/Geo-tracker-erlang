@@ -288,9 +288,9 @@ handle_registration_reply(
 
   % initialize rm_gossip_sender
   gen_server:cast(rm_gossip_sender, {gossip_timeout, GossipTimeout}),
-  gen_server:cast(rm_gossip_sender, {gossip, management, {topology, node(), TTL}}),
   gen_server:cast(rm_gossip_sender, {neighbours, Neighbours}),
   gen_server:cast(rm_gossip_sender, {config, Config}),
+  gen_server:cast(rm_gossip_sender, {gossip, management, {topology, node(), TTL}}),
 
   % initialize rm_gossip_reception
   gen_server:cast(rm_gossip_reception, {config, Config}),
