@@ -33,6 +33,11 @@ initialize_dispatchers(Total_number_of_dispatcher) ->
 
 initialize_dispatchers(Total,Current_step) ->
   if
-    Current_step =< Total -> [list_to_atom(atom_to_list('d') ++ atom_to_list(binary_to_atom(list_to_binary(integer_to_list(Current_step)),utf8)) ++ atom_to_list(?HOST))] ++ initialize_dispatchers(Total, Current_step + 1);
+    Current_step =< Total ->
+      [
+        list_to_atom(atom_to_list('d') ++
+        atom_to_list(binary_to_atom(list_to_binary(integer_to_list(Current_step)),utf8)) ++
+        atom_to_list(?HOST))
+      ] ++ initialize_dispatchers(Total, Current_step + 1);
     true -> []
   end.
