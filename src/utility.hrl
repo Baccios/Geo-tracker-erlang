@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%%% @author L. Bacciottini
+%%% @author L. Bacciottini, F.Pacini
 %%% @copyright (C) 2021, UNIPI
 %%% @doc
 %%%
