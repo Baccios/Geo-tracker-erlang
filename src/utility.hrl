@@ -6,7 +6,7 @@
 %%% @end
 %%% Created : 03. Feb 2021 12:51 PM
 %%%-------------------------------------------------------------------
--author("L. Bacciottini").
+-author("L. Bacciottini, F. Pacini").
 -record(config, {version, fanout, max_neighbours, sub_probability}).
 -record(dispatcher_config, {rm_config, timeout_alive, gossip_protocol_timeout}).
 
