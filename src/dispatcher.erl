@@ -76,7 +76,7 @@ handle_call(Request, From, State = #dispatcher_state{neighbours_list = Neigh_lis
       send_message(Neigh_list,{registration_propagation,RM_id}),
       Validity = check_validity_of_rm_config(Config#dispatcher_config.rm_config#config.fanout,
                                               length(Rms_list) + 1),
-      {RM_ID, _} = pick_random_element(Rms_list),
+      {RM_ID, _} = pick_random_element(Rms_list ++ [{RM_id,0}]),
       case Validity of
         bad ->
           New_version = Config#dispatcher_config.rm_config#config.version + 1,
@@ -101,7 +101,7 @@ handle_call(Request, From, State = #dispatcher_state{neighbours_list = Neigh_lis
                           configuration = New_rm_config} %%diff in time by -
       };
 
-    {update, User_ID, New_state, Version, Priority} ->
+    {USER_PID,update, User_ID, New_state, Version, Priority} ->
       io:format("[dispatcher] receive a update mex from user: ~w~n", [User_ID]),
       {RM_ID, _} = pick_random_element(Rms_list), %%Since extract.. returns a list (in this case of 1 element)
       io:format("[dispatcher] sending it to rm: ~w~n", [RM_ID]),
@@ -110,37 +110,38 @@ handle_call(Request, From, State = #dispatcher_state{neighbours_list = Neigh_lis
       %%Update alive
       %%Return reply
       case Reply of
-        {update_reply, _Map}  ->
+        {update_reply, New_Version}  ->
           %%Update alive
           %%Return reply
           io:format("[dispatcher] receive a reply mex for update user ~w from RM~n", [User_ID]),
           {
             reply,
-            Reply,
+            {USER_PID, update_reply, New_Version},
             #dispatcher_state{neighbours_list = Neigh_list,
               rms_list = renew_last_time_contact_of_rm_in_list(RM_ID,Rms_list),
               configuration = Config}
           };
         _Error ->
-          io:format("[dispatcher] receive an error reply mex for update user ~w from RM~n", [User_ID]),
+          io:format("[dispatcher] receive an error reply mex for update user ~w from RM Body ~w~n", [User_ID,_Error]),
           {
             reply,
-            {error, not_responding},
+            {USER_PID, error, not_responding},
             State
           }
       end;
 
-    {map, List_of_user_id_version} ->
+    {USER_PID, map, List_of_user_id_version} ->
       io:format("[dispatcher] receive a map mex from user: ~w~n", [From]),
       {RM_ID, _} = pick_random_element(Rms_list), %%Since extract.. returns a list (in this case of 1 element)
       Reply = (catch gen_server:call({rm_map_server, RM_ID},{map, List_of_user_id_version}, ?MAP_TIMEOUT)),
       case Reply of
-        {map_reply, _Map}  ->
+        {map_reply, Map}  ->
           %%Update alive
           %%Return reply
+          io:format("[dispatcher] receive a reply mex for map to user ~w from RM~n", [USER_PID]),
           {
             reply,
-            Reply,
+            {USER_PID, map_reply, Map},
             #dispatcher_state{neighbours_list = Neigh_list,
                               rms_list = renew_last_time_contact_of_rm_in_list(RM_ID,Rms_list),
                               configuration = Config}
@@ -148,7 +149,7 @@ handle_call(Request, From, State = #dispatcher_state{neighbours_list = Neigh_lis
         _Error ->
           {
             reply,
-            {error, not_responding},
+            {USER_PID, error, not_responding},
             State
           }
       end;
@@ -243,30 +244,35 @@ handle_info(Info, State = #dispatcher_state{}) ->
       {noreply, State};
     {From,map,Body} ->
       io:format("[dispatcher] handle_info -map- from = ~w Body = ~w~n",[From,Body]),
-      Reply = (catch gen_server:call(dispatcher,{map, Body})), %timeout handled
-      case Reply of
-        {map_reply, _Map}  ->
-          From ! {Reply};
+      catch gen_server:call(dispatcher,{From, map, Body}),
+      %Reply = (catch gen_server:call(dispatcher,{map, Body})), %timeout handled
+      %case Reply of
+       % {map_reply, _Map}  ->
+       %   From ! {Reply};
 
-        _Error ->
-          From ! {error, not_responding}
-      end,
+      %  _Error ->
+      %    From ! {error, not_responding}
+      %end,
+      {noreply, State};
+
+    {_Local_Server_Pid, {USER_PID,map_reply,Map}} ->
+      io:format("[dispatcher] handle_info -map_reply- to send to = ~w Body = ~w~n",[USER_PID,Map]),
+      USER_PID ! {map_reply, Map},
       {noreply, State};
 
     {From,update,User_ID, New_state, Version, Priority} ->
       io:format("[dispatcher] handle_info -update- from = ~w Body = ~w ~w ~w ~w~n",[From,User_ID, New_state, Version, Priority]),
-      Reply = (catch gen_server:call(dispatcher,{update, User_ID, New_state, Version, Priority})), %timeout handled
-      case Reply of
-        {update_reply, _UpdateReply}  ->
-          From ! {Reply};
-
-        _Error ->
-          From ! {error, not_responding}
-      end,
+      catch gen_server:call(dispatcher,{From,update, User_ID, New_state, Version, Priority}), %timeout handled
+      %%Flow -> user -> gen_server:call{dispatcher..} -> RM -> call response as local ! {..} -> handle_info -> user
       {noreply, State};
 
-    _ ->
-      io:format("[dispatcher] WARNING: bad mex format in handle_info~n"), % DEBUG
+    {_Local_Server_Pid, {USER_PID,update_reply,New_Version}} ->
+      io:format("[dispatcher] handle_info -update_reply- to send to = ~w Version = ~w~n",[USER_PID,New_Version]),
+      USER_PID ! {update_reply, New_Version},
+      {noreply, State};
+
+    _Dummy ->
+      io:format("[dispatcher] WARNING: bad mex format in handle_info Format ~w ~n",[_Dummy]), % DEBUG
       {noreply, State}
   end.
 
