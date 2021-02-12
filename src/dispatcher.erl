@@ -76,12 +76,13 @@ handle_call(Request, From, State = #dispatcher_state{neighbours_list = Neigh_lis
       send_message(Neigh_list,{registration_propagation,RM_id}),
       Validity = check_validity_of_rm_config(Config#dispatcher_config.rm_config#config.fanout,
                                               length(Rms_list) + 1),
+      {RM_ID, _} = pick_random_element(Rms_list),
       case Validity of
         bad ->
           New_version = Config#dispatcher_config.rm_config#config.version + 1,
           send_message(Neigh_list,{config_change,New_version}),
           New_rm_config = update_config(Config, New_version),
-          gen_server:cast({rm_map_server,pick_random_element(Rms_list)},
+          gen_server:cast({rm_map_server,RM_ID},
                           {config, New_rm_config#dispatcher_config.rm_config}); %%infect one rm
         _ -> New_rm_config = Config
       end,
@@ -102,7 +103,8 @@ handle_call(Request, From, State = #dispatcher_state{neighbours_list = Neigh_lis
 
     {update, User_ID, New_state, Version, Priority} ->
       io:format("[dispatcher] receive a update mex from user: ~w~n", [User_ID]),
-      RM_ID = pick_random_element(Rms_list), %%Since extract.. returns a list (in this case of 1 element)
+      {RM_ID, _} = pick_random_element(Rms_list), %%Since extract.. returns a list (in this case of 1 element)
+      io:format("[dispatcher] sending it to rm: ~w~n", [RM_ID]),
       Reply = (catch gen_server:call({rm_map_server, RM_ID},{update, User_ID, New_state, Version, Priority},
                                     ?UPDATE_TIMEOUT)),
       %%Update alive
@@ -130,7 +132,7 @@ handle_call(Request, From, State = #dispatcher_state{neighbours_list = Neigh_lis
 
     {map, List_of_user_id_version} ->
       io:format("[dispatcher] receive a map mex from user: ~w~n", [From]),
-      RM_ID = pick_random_element(Rms_list), %%Since extract.. returns a list (in this case of 1 element)
+      {RM_ID, _} = pick_random_element(Rms_list), %%Since extract.. returns a list (in this case of 1 element)
       Reply = (catch gen_server:call({rm_map_server, RM_ID},{map, List_of_user_id_version}, ?MAP_TIMEOUT)),
       case Reply of
         {map_reply, _Map}  ->
