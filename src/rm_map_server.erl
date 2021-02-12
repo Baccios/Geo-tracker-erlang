@@ -43,7 +43,7 @@ handle_call(
   case Request of
 
     % sent by a Dispatcher. It updates a user's state
-    {update, UserID, Version, NewState, Priority} when is_integer(Priority) and (Priority > 0) and (Priority < 4) ->
+    {update, UserID, NewState, Version, Priority} when is_integer(Priority) and (Priority > 0) and (Priority < 4) ->
       AlreadyPresent = ets:member(Table, UserID),
       if
         AlreadyPresent ->

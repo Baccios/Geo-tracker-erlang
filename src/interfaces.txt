@@ -30,7 +30,7 @@ Note: [term()] means that the list is composed of N elements matching term()
 % UPDATE FORMAT
 
     % Dispatcher ->
-    gen_server:call({rm_map_server, rm_id@localhost}, {update, UserID, Version, NewState, Priority})
+    gen_server:call({rm_map_server, rm_id@localhost}, {update, UserID, NewState, Version, Priority})
 
     % Replica Manager ->
     {update_reply, NewVersion}
