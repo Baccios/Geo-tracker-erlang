@@ -244,7 +244,7 @@ handle_info(Info, State = #dispatcher_state{}) ->
       {noreply, State};
     {From,map,Body} ->
       io:format("[dispatcher] handle_info -map- from = ~w Body = ~w~n",[From,Body]),
-      catch gen_server:call(dispatcher,{From, map, Body}),
+      catch gen_server:call(dispatcher,{From, map, Body},0),
       %Reply = (catch gen_server:call(dispatcher,{map, Body})), %timeout handled
       %case Reply of
        % {map_reply, _Map}  ->
@@ -262,7 +262,7 @@ handle_info(Info, State = #dispatcher_state{}) ->
 
     {From,update,User_ID, New_state, Version, Priority} ->
       io:format("[dispatcher] handle_info -update- from = ~w Body = ~w ~w ~w ~w~n",[From,User_ID, New_state, Version, Priority]),
-      catch gen_server:call(dispatcher,{From,update, User_ID, New_state, Version, Priority}), %timeout handled
+      catch gen_server:call(dispatcher,{From,update, User_ID, New_state, Version, Priority},0), %timeout = 0 otherwise has to wait
       %%Flow -> user -> gen_server:call{dispatcher..} -> RM -> call response as local ! {..} -> handle_info -> user
       {noreply, State};
 
