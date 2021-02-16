@@ -245,14 +245,6 @@ handle_info(Info, State = #dispatcher_state{}) ->
     {From,map,Body} ->
       io:format("[dispatcher] handle_info -map- from = ~w Body = ~w~n",[From,Body]),
       catch gen_server:call(dispatcher,{From, map, Body},0),
-      %Reply = (catch gen_server:call(dispatcher,{map, Body})), %timeout handled
-      %case Reply of
-       % {map_reply, _Map}  ->
-       %   From ! {Reply};
-
-      %  _Error ->
-      %    From ! {error, not_responding}
-      %end,
       {noreply, State};
 
     {_Local_Server_Pid, {USER_PID,map_reply,Map}} ->
@@ -269,6 +261,11 @@ handle_info(Info, State = #dispatcher_state{}) ->
     {_Local_Server_Pid, {USER_PID,update_reply,New_Version}} ->
       io:format("[dispatcher] handle_info -update_reply- to send to = ~w Version = ~w~n",[USER_PID,New_Version]),
       USER_PID ! {update_reply, New_Version},
+      {noreply, State};
+
+    {_Local_Server_Pid, {USER_PID,error, not_responding}} ->
+      io:format("[dispatcher] handle_info -update_reply or map_reply- ERROR: NOT RESPONDING~n"),
+      USER_PID ! {error, not_responding},
       {noreply, State};
 
     _Dummy ->
