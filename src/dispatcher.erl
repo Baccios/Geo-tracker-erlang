@@ -76,7 +76,7 @@ handle_call(Request, From, State = #dispatcher_state{neighbours_list = Neigh_lis
       send_message(Neigh_list,{registration_propagation,RM_id}),
       Validity = check_validity_of_rm_config(Config#dispatcher_config.rm_config#config.fanout,
                                               length(Rms_list) + 1),
-      {RM_ID, _} = pick_random_element(Rms_list ++ [{RM_id,0}]),
+      {RM_ID, _} = pick_random_element(Rms_list ++ [{RM_id, 0}]),
       case Validity of
         bad ->
           New_version = Config#dispatcher_config.rm_config#config.version + 1,
@@ -253,7 +253,10 @@ handle_info(Info, State = #dispatcher_state{}) ->
       {noreply, State};
 
     {From,update,User_ID, New_state, Version, Priority} ->
-      io:format("[dispatcher] handle_info -update- from = ~w Body = ~w ~w ~w ~w~n",[From,User_ID, New_state, Version, Priority]),
+      io:format(
+        "[dispatcher] handle_info -update- from = ~w Body = ~w ~w ~w ~w~n",
+        [From,User_ID, New_state, Version, Priority]
+      ),
       catch gen_server:call(dispatcher,{From,update, User_ID, New_state, Version, Priority},0), %timeout = 0 otherwise has to wait
       %%Flow -> user -> gen_server:call{dispatcher..} -> RM -> call response as local ! {..} -> handle_info -> user
       {noreply, State};
@@ -291,13 +294,18 @@ extract_n_random_element_from_list(List, N) -> %%helper function
   Chosen = lists:nth(Index, List),
   [element(1,Chosen)] ++ extract_n_random_element_from_list(lists:delete(Chosen, List), N - 1).
 
+pick_random_element([]) ->
+  io:format("[dispatcher] WARNING: trying to pick an element from an empty list~n"),
+  false;
 pick_random_element(List) ->
   RandomIndex = rand:uniform(length(List)),
   lists:nth(RandomIndex, List).
 
 get_neigh_list_for_new_rm(Rms_list, MaxNeigh) ->
   if
-    length(Rms_list) =< MaxNeigh -> [RM_id || {RM_id, _} <- Rms_list]; %%If not enough elements in RM_list -> return all
+    %%If not enough elements in RM_list -> return all
+    length(Rms_list) =< MaxNeigh -> [RM_id || {RM_id, _} <- Rms_list];
+
     true -> extract_n_random_element_from_list(Rms_list, MaxNeigh)
   end.
 
@@ -324,7 +332,9 @@ send_message(Neighbours, Msg) ->
   %% send Msg to all neighbours (dispatchers)
   Send = fun (DispatcherNode) ->
     % io:format("~w~n", [RMNode]) end, % DEBUG
-    gen_server:cast({dispatcher, DispatcherNode}, Msg) end, %dispatcher is the name of gen_server in DispatcherNode node
+
+    %dispatcher is the name of gen_server in DispatcherNode node
+    gen_server:cast({dispatcher, DispatcherNode}, Msg) end,
 
   lists:foreach(Send, Neighbours).
 
